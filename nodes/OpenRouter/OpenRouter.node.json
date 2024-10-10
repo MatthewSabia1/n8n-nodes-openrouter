@@ -1,0 +1,20 @@
+{
+    "node": "n8n-nodes-base.openRouter",
+    "nodeVersion": "1.0",
+    "codexVersion": "1.0",
+    "categories": [
+        "AI"
+    ],
+    "resources": {
+        "credentialDocumentation": [
+            {
+                "url": "https://openrouter.ai/docs#authentication"
+            }
+        ],
+        "primaryDocumentation": [
+            {
+                "url": "https://openrouter.ai/docs"
+            }
+        ]
+    }
+}
