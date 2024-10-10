@@ -5,13 +5,17 @@
     "moduleResolution": "node",
     "target": "es2019",
     "outDir": "./dist",
-    "rootDir": "./src",
+    "rootDir": ".",
     "types": ["node", "jest"],
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "n8n-workflow": ["node_modules/n8n-workflow"]
+    }
   },
-  "include": ["src/**/*", "src/**/*.test.ts"],
-  "exclude": ["node_modules"]
+  "include": ["credentials/**/*", "nodes/**/*", "package.json"],
+  "exclude": ["node_modules", "dist"]
 }

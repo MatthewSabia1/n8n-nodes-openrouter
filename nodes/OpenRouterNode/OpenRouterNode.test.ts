@@ -1,4 +1,4 @@
-import { OpenRouterNode } from './OpenRouterNode';
+import { OpenRouterNode } from './OpenRouterNode.node';
 import { INodeType } from 'n8n-workflow';
 
 describe('OpenRouterNode', () => {

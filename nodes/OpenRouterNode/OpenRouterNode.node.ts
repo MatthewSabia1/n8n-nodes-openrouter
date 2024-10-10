@@ -5,6 +5,9 @@ import {
 	INodeTypeDescription,
 	IDataObject,
 	IHttpRequestOptions,
+	NodeApiError,
+	NodeOperationError,
+	JsonObject,
 } from 'n8n-workflow';
 
 export class OpenRouterNode implements INodeType {
@@ -36,6 +39,7 @@ export class OpenRouterNode implements INodeType {
 						name: 'Chat Completion',
 						value: 'chatCompletion',
 						description: 'Create a chat completion',
+						action: 'Create a chat completion',
 					},
 				],
 				default: 'chatCompletion',
@@ -100,42 +104,44 @@ export class OpenRouterNode implements INodeType {
 		const returnData: INodeExecutionData[] = [];
 
 		for (let i = 0; i < items.length; i++) {
-			const operation = this.getNodeParameter('operation', i) as string;
-			const model = this.getNodeParameter('model', i) as string;
-			const messagesInput = this.getNodeParameter('messages.messagesValues', i, []) as Array<{
-				role: string;
-				content: string;
-			}>;
+			try {
+				const operation = this.getNodeParameter('operation', i) as string;
+				const model = this.getNodeParameter('model', i) as string;
+				const messagesInput = this.getNodeParameter('messages.messagesValues', i, []) as Array<{
+					role: string;
+					content: string;
+				}>;
 
-			if (operation === 'chatCompletion') {
-				const credentials = await this.getCredentials('openRouterApi');
-				
-				const options: IHttpRequestOptions = {
-					method: 'POST',
-					url: 'https://openrouter.ai/api/v1/chat/completions',
-					headers: {
-						'Authorization': `Bearer ${credentials.apiKey}`,
-						'Content-Type': 'application/json',
-					},
-					body: {
-						model,
-						messages: messagesInput,
-					},
-					json: true,
-				};
+				if (operation === 'chatCompletion') {
+					const credentials = await this.getCredentials('openRouterApi');
+					
+					const options: IHttpRequestOptions = {
+						method: 'POST',
+						url: 'https://openrouter.ai/api/v1/chat/completions',
+						headers: {
+							'Authorization': `Bearer ${credentials.apiKey}`,
+							'Content-Type': 'application/json',
+						},
+						body: {
+							model,
+							messages: messagesInput,
+						},
+						json: true,
+					};
 
-				try {
-					const response = await this.helpers.request(options);
-					returnData.push({ json: response as IDataObject });
-				} catch (error: any) {
-					if (error.response && typeof error.response === 'object' && error.response !== null) {
-						const errorResponse = error.response as { body?: { error?: string } };
-						if (errorResponse.body && typeof errorResponse.body.error === 'string') {
-							throw new Error(`OpenRouter API request failed: ${errorResponse.body.error}`);
-						}
+					try {
+						const response = await this.helpers.request(options);
+						returnData.push({ json: response as IDataObject });
+					} catch (error) {
+						throw new NodeApiError(this.getNode(), error as JsonObject);
 					}
-					throw new Error(`OpenRouter API request failed: ${error.message}`);
 				}
+			} catch (error) {
+				if (this.continueOnFail()) {
+					returnData.push({ json: { error: (error as Error).message } });
+					continue;
+				}
+				throw error;
 			}
 		}
 
