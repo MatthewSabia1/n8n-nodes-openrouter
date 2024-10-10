@@ -101,7 +101,6 @@ export class OpenRouterNode implements INodeType {
 					},
 				],
 			},
-			// Expose adjustable model parameters
 			{
 				displayName: 'Max Tokens',
 				name: 'max_tokens',
@@ -186,14 +185,19 @@ export class OpenRouterNode implements INodeType {
 					url: 'https://openrouter.ai/api/v1/models',
 					headers: {
 						Authorization: `Bearer ${apiKey}`,
+						'HTTP-Referer': 'https://n8n.io',
+						'X-Title': 'n8n OpenRouter Node',
 					},
 					json: true,
 				};
 
 				try {
+					console.log('Fetching models from OpenRouter API...');
 					const response = await this.helpers.request(requestOptions);
-					const models = response as IDataObject[];
+					console.log('Response received:', JSON.stringify(response, null, 2));
+					const models = response.data as IDataObject[];
 					if (!models || !Array.isArray(models)) {
+						console.error('Invalid response format:', response);
 						throw new NodeOperationError(
 							this.getNode(),
 							'Invalid response format from OpenRouter API',
@@ -204,11 +208,19 @@ export class OpenRouterNode implements INodeType {
 						value: model.id as string,
 						description: model.description as string,
 					}));
-				} catch (error) {
-					throw new NodeOperationError(
-						this.getNode(),
-						'Failed to load models from OpenRouter API',
-					);
+				} catch (error: unknown) {
+					console.error('Error fetching models:', error);
+					if (error instanceof Error) {
+						throw new NodeOperationError(
+							this.getNode(),
+							`Failed to load models from OpenRouter API: ${error.message}`,
+						);
+					} else {
+						throw new NodeOperationError(
+							this.getNode(),
+							'Failed to load models from OpenRouter API: Unknown error',
+						);
+					}
 				}
 			},
 		},
@@ -262,6 +274,8 @@ export class OpenRouterNode implements INodeType {
 						headers: {
 							Authorization: `Bearer ${apiKey}`,
 							'Content-Type': 'application/json',
+							'HTTP-Referer': 'https://n8n.io',
+							'X-Title': 'n8n OpenRouter Node',
 						},
 						body,
 						json: true,
