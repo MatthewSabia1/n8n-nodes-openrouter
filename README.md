@@ -41,6 +41,14 @@ To use this node, you need to have n8n installed. If you haven't done that yet, 
 
 After installing this node, you can use it like any other n8n node. Add it to your workflow and configure it according to your needs.
 
+### Chat Completion
+
+1. Select the 'Chat Completion' operation
+2. Choose the AI model from the dropdown list of available OpenRouter models
+3. Add your messages in the 'Messages' section
+4. Configure additional options like temperature and max tokens if needed
+5. Enable streaming if you want to receive partial responses
+
 ## Resources
 
 * [n8n community nodes documentation](https://docs.n8n.io/integrations/community-nodes/)
@@ -48,6 +56,7 @@ After installing this node, you can use it like any other n8n node. Add it to yo
 
 ## Version history
 
+0.2.0 - Added support for streaming responses, improved error handling, added additional options (temperature, max tokens), and implemented a dropdown selector for OpenRouter models
 0.1.0 - Initial release
 
 ## Development

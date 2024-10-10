@@ -8,6 +8,8 @@ import {
 	NodeApiError,
 	NodeOperationError,
 	JsonObject,
+	ILoadOptionsFunctions,
+	INodePropertyOptions,
 } from 'n8n-workflow';
 
 export class OpenRouterNode implements INodeType {
@@ -46,11 +48,14 @@ export class OpenRouterNode implements INodeType {
 				noDataExpression: true,
 			},
 			{
-				displayName: 'Model',
+				displayName: 'Model Name or ID',
 				name: 'model',
-				type: 'string',
-				default: 'openai/gpt-3.5-turbo',
-				description: 'The model to use for the completion',
+				type: 'options',
+				typeOptions: {
+					loadOptionsMethod: 'getModels',
+				},
+				default: '',
+				description: 'The model to use for the completion. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 				required: true,
 			},
 			{
@@ -96,7 +101,71 @@ export class OpenRouterNode implements INodeType {
 					},
 				],
 			},
+			{
+				displayName: 'Options',
+				name: 'options',
+				type: 'collection',
+				placeholder: 'Add Option',
+				default: {},
+				options: [
+					{
+						displayName: 'Temperature',
+						name: 'temperature',
+						type: 'number',
+						typeOptions: {
+							minValue: 0,
+							maxValue: 2,
+							numberStepSize: 0.1,
+						},
+						default: 1,
+						description: 'Controls randomness: Lowering results in less random completions. As the temperature approaches zero, the model will become deterministic and repetitive.',
+					},
+					{
+						displayName: 'Max Tokens',
+						name: 'max_tokens',
+						type: 'number',
+						typeOptions: {
+							minValue: 1,
+						},
+						default: 16,
+						description: 'The maximum number of tokens to generate in the completion',
+					},
+					{
+						displayName: 'Stream',
+						name: 'stream',
+						type: 'boolean',
+						default: false,
+						description: 'Whether to stream back partial progress. If set, tokens will be sent as data-only server-sent events as they become available.',
+					},
+				],
+			},
 		],
+	};
+
+	methods = {
+		loadOptions: {
+			async getModels(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+				const credentials = await this.getCredentials('openRouterApi');
+				const requestOptions: IHttpRequestOptions = {
+					method: 'GET',
+					url: 'https://openrouter.ai/api/v1/models',
+					headers: {
+						'Authorization': `Bearer ${credentials.apiKey}`,
+					},
+				};
+
+				try {
+					const response = await this.helpers.request(requestOptions);
+					const models = response.data as IDataObject[];
+					return models.map((model) => ({
+						name: model.name as string,
+						value: model.id as string,
+					}));
+				} catch (error) {
+					throw new NodeOperationError(this.getNode(), 'Failed to load models from OpenRouter API');
+				}
+			},
+		},
 	};
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
@@ -111,34 +180,63 @@ export class OpenRouterNode implements INodeType {
 					role: string;
 					content: string;
 				}>;
+				const options = this.getNodeParameter('options', i, {}) as IDataObject;
 
 				if (operation === 'chatCompletion') {
+					// Input validation
+					if (messagesInput.length === 0) {
+						throw new NodeOperationError(this.getNode(), 'At least one message is required.');
+					}
+
 					const credentials = await this.getCredentials('openRouterApi');
-					
-					const options: IHttpRequestOptions = {
+
+					const body: IDataObject = {
+						model,
+						messages: messagesInput,
+						...options,
+					};
+
+					const requestOptions: IHttpRequestOptions = {
 						method: 'POST',
 						url: 'https://openrouter.ai/api/v1/chat/completions',
 						headers: {
 							'Authorization': `Bearer ${credentials.apiKey}`,
 							'Content-Type': 'application/json',
 						},
-						body: {
-							model,
-							messages: messagesInput,
-						},
+						body,
 						json: true,
 					};
 
 					try {
-						const response = await this.helpers.request(options);
-						returnData.push({ json: response as IDataObject });
+						if (options.stream) {
+							// For streaming, we'll use the raw response
+							requestOptions.json = false;
+							requestOptions.encoding = 'text';
+
+							const response = await this.helpers.request(requestOptions);
+							const chunks = (response as string).split('\n\n').filter((chunk: string) => chunk.trim() !== '');
+							const parsedChunks = chunks.map((chunk: string) => {
+								const jsonStr = chunk.replace('data: ', '');
+								return JSON.parse(jsonStr);
+							});
+							returnData.push({ json: { streamedResponse: parsedChunks } });
+						} else {
+							const response = await this.helpers.request(requestOptions);
+							returnData.push({ json: response as IDataObject });
+						}
 					} catch (error) {
-						throw new NodeApiError(this.getNode(), error as JsonObject);
+						if (error instanceof Error) {
+							const apiError = error as Error & { response?: { data?: JsonObject } };
+							if (apiError.response && apiError.response.data) {
+								throw new NodeApiError(this.getNode(), apiError.response.data);
+							}
+						}
+						throw error;
 					}
 				}
 			} catch (error) {
 				if (this.continueOnFail()) {
-					returnData.push({ json: { error: (error as Error).message } });
+					returnData.push({ json: { error: error instanceof Error ? error.message : 'An unknown error occurred' } });
 					continue;
 				}
 				throw error;
