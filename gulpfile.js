@@ -11,5 +11,9 @@ function copyReadme() {
         .pipe(dest('.'));
 }
 
+function copyAssets() {
+    return src('nodes/**/*.svg')
+        .pipe(dest('dist/nodes'));
+}
 
-exports.default = series(copyReadme);
+exports.default = series(copyReadme, copyAssets);
